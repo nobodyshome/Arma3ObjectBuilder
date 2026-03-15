@@ -37,6 +37,12 @@ def can_export(operator, context):
     return False
 
 
+def get_pbo_prefix(operator):
+    if operator.relative_paths and operator.pbo_prefix_enabled:
+        return operator.pbo_prefix
+    return ""
+
+
 def create_temp_collection(context):
     temp = bpy.data.collections.get("A3OB_temp")
     if temp is None:
@@ -176,7 +182,7 @@ def merge_sub_objects(operator, main_obj, sub_objects):
         computils.call_operator_ctx(bpy.ops.object.join, ctx)
 
 
-def merge_proxy_objects(main_obj, proxy_objects, relative):
+def merge_proxy_objects(main_obj, proxy_objects, relative, pbo_prefix = ""):
     # Blender has a 63 character length limit on vertex group names,
     # so the proxy paths can't be written to the group name directly,
     # a placeholder name must be used, and added to a lookup dictionary.
@@ -187,7 +193,7 @@ def merge_proxy_objects(main_obj, proxy_objects, relative):
 
         placeholder = "@proxy_%d" % i
         utils.create_selection(proxy, placeholder)
-        proxy_lookup[placeholder] = proxy.a3ob_properties_object_proxy.to_placeholder(relative)
+        proxy_lookup[placeholder] = proxy.a3ob_properties_object_proxy.to_placeholder(relative, pbo_prefix)
 
         utils.clear_uvs(proxy)
 
@@ -208,11 +214,12 @@ def merge_proxy_objects(main_obj, proxy_objects, relative):
 
 
 def validate_proxies(operator, proxy_objects):
+    pbo_prefix = get_pbo_prefix(operator)
     for proxy in proxy_objects:
         if len(proxy.data.polygons) != 1 or len(proxy.data.polygons[0].vertices) != 3:
             return False
 
-        path, _ = proxy.a3ob_properties_object_proxy.to_placeholder(operator.relative_paths)
+        path, _ = proxy.a3ob_properties_object_proxy.to_placeholder(operator.relative_paths, pbo_prefix)
         if not is_ascii(path):
             return False
         
@@ -225,7 +232,7 @@ def validate_proxies(operator, proxy_objects):
             if not mat:
                 continue
             
-            texture, material = mat.a3ob_properties_material.to_p3d(operator.relative_paths)
+            texture, material = mat.a3ob_properties_material.to_p3d(operator.relative_paths, pbo_prefix)
             if not is_ascii(texture) or not is_ascii(material):
                 return False
     
@@ -359,7 +366,8 @@ def get_lod_data(operator, context, validator, temp_collection):
         with temporary_component(operator, main_obj):
             is_valid &= validator.validate_lod(main_obj, main_obj.a3ob_properties_object.lod, True, operator.validate_lods_warning_errors and operator.validate_lods, operator.relative_paths)
 
-        proxy_lookup = merge_proxy_objects(main_obj, proxy_objects, operator.relative_paths)
+        pbo_prefix = get_pbo_prefix(operator)
+        proxy_lookup = merge_proxy_objects(main_obj, proxy_objects, operator.relative_paths, pbo_prefix)
 
         if operator.apply_transforms:
             apply_transforms(main_obj)
@@ -423,13 +431,13 @@ def process_normals(mesh):
 
 # Produce material lookup dictionary from the materials assigned to the object.
 # {material 0: (texture, material), ...: (..., ....), ...}
-def process_materials(obj, relative):
+def process_materials(obj, relative, pbo_prefix = ""):
     output = {0: ("", "")}
 
     for i, slot in enumerate(obj.material_slots):
         mat = slot.material
         if mat:
-            output[i] = mat.a3ob_properties_material.to_p3d(relative)
+            output[i] = mat.a3ob_properties_material.to_p3d(relative, pbo_prefix)
         else:
             output[i] = ("", "")
 
@@ -438,10 +446,10 @@ def process_materials(obj, relative):
 
 # Produce the face data dictionary from the obj and  bmesh data.
 # {face 0: ([vert 0, vert 1, vert 2], [normal 0, normal 1, normal 2], [(uv 0 0, uv 0 1), (...), ...], texture, material, flag), ...}
-def process_faces(obj, bm, normals_lookup, relative):
+def process_faces(obj, bm, normals_lookup, relative, pbo_prefix = ""):
     output = []
     # Materials need to be precompiled to speed up the face access.
-    materials = process_materials(obj, relative)
+    materials = process_materials(obj, relative, pbo_prefix)
 
     uv_layer = None
     if len(bm.loops.layers.uv.values()) > 0: # 1st UV set needs to be written into the face data section too
@@ -636,7 +644,8 @@ def process_lod(operator, obj, proxy_lookup, is_valid, processed_signatures, log
 
     output.verts = process_vertices(bm)
     logger.step("Collected vertices")
-    output.faces = process_faces(obj, bm, normals_lookup_dict, operator.relative_paths)
+    pbo_prefix = get_pbo_prefix(operator)
+    output.faces = process_faces(obj, bm, normals_lookup_dict, operator.relative_paths, pbo_prefix)
     logger.step("Collected faces")
     output.taggs = process_taggs(obj, bm, logger)
 

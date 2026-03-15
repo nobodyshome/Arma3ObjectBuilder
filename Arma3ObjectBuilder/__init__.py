@@ -1,8 +1,8 @@
 bl_info = {
-    "name": "Arma 3 Object Builder",
+    "name": "Arma 3 Object Builder (PBO Prefix)",
     "description": "Collection of tools for editing Arma 3 content",
     "author": "MrClock (present add-on), Hans-Joerg \"Alwarren\" Frieden (original ArmaToolbox add-on)",
-    "version": (2, 5, 1),
+    "version": (2, 6, 0),
     "blender": (2, 90, 0),
     "location": "Object Builder panels",
     "warning": "Development",

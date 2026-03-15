@@ -203,12 +203,39 @@ def make_relative(path, root):
     return path
 
 
-def format_path(path, root = "", to_relative = True, extension = True):
+def apply_pbo_prefix(path, prefix):
+    if not prefix:
+        return path
+    
+    # Normalize the prefix - strip leading/trailing backslashes
+    prefix = prefix.strip().strip("\\")
+    if not prefix:
+        return path
+    
+    # Split path into components
+    parts = path.split("\\")
+    
+    # Find the first non-empty component (skip leading backslash if present)
+    first_idx = 0
+    while first_idx < len(parts) and parts[first_idx] == "":
+        first_idx += 1
+    
+    if first_idx >= len(parts):
+        return path
+    
+    # Replace the first folder component with the prefix
+    parts[first_idx] = prefix
+    
+    return "\\".join(parts)
+
+
+def format_path(path, root = "", to_relative = True, extension = True, pbo_prefix = ""):
     path = replace_slashes(path.strip())
     
     if to_relative:
         root = replace_slashes(root.strip())
         path = make_relative(path, root)
+        path = apply_pbo_prefix(path, pbo_prefix)
         
     if not extension:
         path = os.path.splitext(path)[0]
