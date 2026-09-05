@@ -206,6 +206,9 @@ def make_relative(path, root):
 def apply_pbo_prefix(path, prefix):
     if not prefix:
         return path
+
+    if path.startswith("\\") and ":\\" not in path:
+        return path
     
     # Normalize the prefix - strip leading/trailing backslashes
     prefix = prefix.strip().strip("\\")
